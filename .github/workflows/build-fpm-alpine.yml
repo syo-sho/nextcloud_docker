@@ -1,4 +1,4 @@
-name: Build Nextcloud FPM Alpine Latest
+name: Build Nextcloud Latest FPM Alpine
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-fpm-alpine:
+  build-latest-fpm-alpine:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,11 +25,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push fpm-alpine latest
+      - name: Build and push latest fpm-alpine
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: Dockerfile-alpine.template
+          context: 33/fpm-alpine
+          file: 33/fpm-alpine/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/nextcloud:fpm-alpine
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/nextcloud:fpm-alpine
+            ghcr.io/${{ github.repository_owner }}/nextcloud:33-fpm-alpine
