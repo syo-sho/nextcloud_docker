@@ -2,20 +2,37 @@ name: Sync Upstream
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "0 0 * * *"   # 每天一次
   workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout your fork
+        uses: actions/checkout@v4
         with:
-          repository: nextcloud/docker
-          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Sync
+      - name: Add upstream
         run: |
-          git remote add fork https://github.com/${{ github.repository }}.git
-          git push fork HEAD:master --force
+          git remote add upstream https://github.com/nextcloud/docker.git
+          git fetch upstream
+
+      - name: Merge upstream into master (ignore workflows)
+        run: |
+          git checkout master
+          git merge upstream/master --no-edit || true
+
+          # 删除 upstream 的 workflow 文件，避免覆盖你的 workflow
+          rm -rf .github/workflows
+
+      - name: Push back to your fork
+        run: |
+          git add .
+          git commit -m "Sync upstream (code only)" || true
+          git push origin master
