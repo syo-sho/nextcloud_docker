@@ -1,6 +1,9 @@
-name: Images
+name: ImagesCrate
 
-permissions: {}
+# 显式声明权限，允许工作流向 GitHub Container Registry (GHCR) 写入镜像
+permissions:
+  contents: read    # 允许拉取代码
+  packages: write   # 允许创建和推送容器镜像
 
 on:
   pull_request:
@@ -62,4 +65,8 @@ jobs:
 
     steps:
       - name: Summary status
-        run: if ${{ needs.build.result != 'success' && needs.build.result != 'skipped' }}; then exit 1; fi
+        run: |
+          if [ "${{ needs.build.result }}" != "success" ] && [ "${{ needs.build.result }}" != "skipped" ]; then
+            echo "Build job failed!"
+            exit 1
+          fi
