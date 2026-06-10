@@ -43,14 +43,16 @@ jobs:
         run: |
           cd "${{ needs.init.outputs.version }}/fpm-alpine"
           docker build --platform linux/amd64 \
-            -t ghcr.io/${{ github.repository }}:${{ needs.init.outputs.version }}-fpm-alpine \
+            -t ghcr.io/${{ github.actor }}/nextcloud_docker:${{ needs.init.outputs.version }}-fpm-alpine \
+            -t ghcr.io/${{ github.actor }}/nextcloud_docker:fpm-alpine \
             .
 
       - name: Push image
         if: github.ref == 'refs/heads/master'
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          docker push ghcr.io/${{ github.repository }}:${{ needs.init.outputs.version }}-fpm-alpine
+          docker push ghcr.io/${{ github.actor }}/nextcloud_docker:${{ needs.init.outputs.version }}-fpm-alpine
+          docker push ghcr.io/${{ github.actor }}/nextcloud_docker:fpm-alpine
 
   summary:
     runs-on: ubuntu-latest
