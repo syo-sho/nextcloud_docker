@@ -39,21 +39,18 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Prepare build context
-        run: |
-          cd "${{ needs.init.outputs.version }}/fpm-alpine"
-          cp Dockerfile-alpine.template Dockerfile
-
       - name: Build amd64 image
         run: |
           cd "${{ needs.init.outputs.version }}/fpm-alpine"
-          docker build --platform linux/amd64 -t ghcr.io/${{ github.repository }}:fpm-alpine .
+          docker build --platform linux/amd64 \
+            -t ghcr.io/${{ github.repository }}:${{ needs.init.outputs.version }}-fpm-alpine \
+            .
 
       - name: Push image
         if: github.ref == 'refs/heads/master'
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          docker push ghcr.io/${{ github.repository }}:fpm-alpine
+          docker push ghcr.io/${{ github.repository }}:${{ needs.init.outputs.version }}-fpm-alpine
 
   summary:
     runs-on: ubuntu-latest
