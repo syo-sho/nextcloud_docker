@@ -1,7 +1,9 @@
----
-name: Images
+name: ImagesCrate
 
-permissions: {}
+# 显式声明权限，允许工作流向 GitHub Container Registry (GHCR) 写入镜像
+permissions:
+  contents: read    # 允许拉取代码
+  packages: write   # 允许创建和推送容器镜像
 
 on:
   pull_request:
@@ -18,51 +20,53 @@ defaults:
 jobs:
 
   init:
-    name: Generate Jobs
+    name: Detect Latest Version
     runs-on: ubuntu-latest
     outputs:
-      strategy: ${{ steps.generate-jobs.outputs.strategy }}
+      version: ${{ steps.detect.outputs.version }}
     steps:
       - uses: actions/checkout@v6
-      - uses: docker-library/bashbrew@HEAD
-      - id: generate-jobs
-        name: Generate Jobs
-        run: |
-          strategy="$(GITHUB_REPOSITORY=nextcloud "$BASHBREW_SCRIPTS/github-actions/generate.sh")"
-          strategy="$("$BASHBREW_SCRIPTS/github-actions/munge-i386.sh" -c <<<"$strategy")"
-          echo "strategy=$strategy" >> "$GITHUB_OUTPUT"
-          jq . <<<"$strategy" # sanity check / debugging aid
 
-  test:
+      - id: detect
+        name: Detect latest Nextcloud version directory
+        run: |
+          latest="$(ls -1d [0-9]* | sort -n | tail -1)"
+          echo "version=$latest" >> "$GITHUB_OUTPUT"
+          echo "Detected latest version: $latest"
+
+  build:
     needs: init
-    strategy: ${{ fromJson(needs.init.outputs.strategy) }}
-    name: ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    name: Build fpm-alpine (amd64 only)
+
     steps:
       - uses: actions/checkout@v6
-      - name: Prepare Environment
-        run: ${{ matrix.runs.prepare }}
-      - name: Run update.sh script
-        run: ./update.sh
-      - name: Pull Dependencies
-        run: ${{ matrix.runs.pull }}
-      - name: Build ${{ matrix.name }}
-        run: ${{ matrix.runs.build }}
-      - name: History ${{ matrix.name }}
-        run: ${{ matrix.runs.history }}
-      - name: Test ${{ matrix.name }}
-        run: ${{ matrix.runs.test }}
-      - name: '"docker images"'
-        run: ${{ matrix.runs.images }}
+
+      - name: Build amd64 image
+        run: |
+          cd "${{ needs.init.outputs.version }}/fpm-alpine"
+          docker build --platform linux/amd64 \
+            -t ghcr.io/${{ github.actor }}/nextcloud_docker:${{ needs.init.outputs.version }}-fpm-alpine \
+            -t ghcr.io/${{ github.actor }}/nextcloud_docker:fpm-alpine \
+            .
+
+      - name: Push image
+        if: github.ref == 'refs/heads/master'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker push ghcr.io/${{ github.actor }}/nextcloud_docker:${{ needs.init.outputs.version }}-fpm-alpine
+          docker push ghcr.io/${{ github.actor }}/nextcloud_docker:fpm-alpine
 
   summary:
     runs-on: ubuntu-latest
-    needs: test
-
+    needs: build
     if: always()
-
     name: images-test-summary
 
     steps:
       - name: Summary status
-        run: if ${{ needs.test.result != 'success' && needs.test.result != 'skipped' }}; then exit 1; fi
+        run: |
+          if [ "${{ needs.build.result }}" != "success" ] && [ "${{ needs.build.result }}" != "skipped" ]; then
+            echo "Build job failed!"
+            exit 1
+          fi
